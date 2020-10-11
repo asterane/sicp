@@ -1,0 +1,354 @@
+* Structure and Interpretation of Computer Programs
+** Section 1.1
+The Elements of Programming
+
+*** Exercise 1.1
+Result from the interpreter for each expression (evaluated in the
+order presented)
+
+#+begin_example
+10 => 10
+(+ 5 3 4) => 12
+(- 9 1) => 8
+(/ 6 2) => 3
+(+ (* 2 4) (- 4 6)) => 6
+(define a 3) => a
+(define b (+ a 1)) => b
+(+ a b (* a b)) => 19
+(= a b) => #f
+(if (and (> b a) (< b (* a b)))
+    b
+    a) => 4
+(cond ((= a 4) 6)
+      ((= b 4) (+ 6 7 a))
+      (else 25)) => 16
+(+ 2 (if (> b a) b a)) => 6
+(* (cond ((> a b) a)
+         ((< a b) b)
+         (else -1))
+   (+ a 1)) => 16
+#+end_example
+
+*** Exercise 1.2
+Translate an expression from mathematical notation into prefix
+notation
+
+#+begin_example
+(/ (+ 5 4 (- 2 (- 3 (+ 6 (/ 1 5)))))
+   (* 3 (- 6 2) (- 2 7)))
+#+end_example
+
+*** Exercise 1.3
+Define a procedure that takes three arguments and returns the sum of
+the squares of the larger numbers
+
+#+begin_src scheme
+(define (large-square-sum a b c)
+  (cond ((and (< a b) (< a c)) (+ (* b b) (* c c)))
+        ((and (< b a) (< b c)) (+ (* a a) (* c c)))
+        (else (+ (* a a) (* b b)))))
+#+end_src
+
+*** Exercise 1.4
+Describe the behavior of a certain procedure whose operators are
+compound expressions
+
+#+begin_src scheme
+(define (a-plus-abs-b a b)
+  ((if (> b 0) + -) a b))
+#+end_src
+
+This procedure takes two arguments, then evaluates an expression whose
+first term is an if statement. If b is greater than 0, the if
+statement evaluates to the addition operator, while otherwise, it
+evaluates to the subtraction operator. The operator so determined is
+then used on the two arguments, leading to =(+ a b)= or =(- a b)=.
+
+*** Exercise 1.5
+What behavior will a certain procedure exhibit with applicative order
+evaluation? What behavior will it exhibit with normal order
+evaluation? Explain.
+
+#+begin_src scheme
+(define (p) (p))
+
+(define (test x y)
+  (if (= x 0)
+      0
+      y))
+
+(test 0 (p))
+#+end_src
+
+**** Applicative Order:
+#+begin_example
+(test 0 (p))
+(test 0 (p))
+(test 0 (p))
+...
+#+end_example
+Since the interpreter aims to evaluate every argument before
+proceeding to evaluate the function, it will become stuck in an
+infinite loop here as it tries to evaluate p.
+
+**** Normal Order:
+#+begin_example
+(test 0 (p))
+(if (= x 0) 0 y)
+(if (= 0 0) 0 (p))
+0
+#+end_example
+In normal order, the arguments are carried into the function body, not
+to be evaluated until the end. Here, the if form is evaluated to true,
+and the (p) is discarded.
+
+*** Exercise 1.6
+Explain the outcome of trying to compute square roots using =if=
+defined as an ordinary procedure.
+
+When if is an ordinary procedure built on top of =cond=, instead of a
+special form, the interpreter evaluates all of the arguments (or tries
+to) before proceeding to the procedure body. When this is used in the
+square root computation, the attempt to recur =sqrt-iter= will fail,
+because the interpreter attempts to evaluate it even before the
+condition in the body of =new-if=. When if is a special form, the
+arguments following the predicate are /only/ evaluated based on the
+value of the predicate.
+
+*** Exercise 1.7
+Explain and show how the =good-enough?= test used in the square root
+calculation fails for small and large numbers. An alternative strategy
+is to track how =guess= changes across iterations and stop when the
+change is small enough. Design a procedure with this kind of test;
+does it work better?
+
+#+begin_example
+(sqrt 0.001) => 0.041245
+square root of 0.001 = 0.031622
+
+(sqrt 10000000000000) => [infinite loop]
+higher numbers behave the same
+#+end_example
+
+For small numbers, we see a loss of precision that can lead the
+computed value to be incorrect by one part in four or more, because
+the threshold for the good enough test is set at a thousandth, not a
+proportion of the guess.
+
+For large numbers, the interpreter seems to fall into an infinite
+loop. Presumably the system is not able to deal with numbers greater
+than a trillion for some reason.
+
+[[file:sqrt.scm::> (/ guess (abs change)) 1000000)][Square Root Implementation]]
+
+The new end test works much better, computing accurate square roots
+for small and large numbers alike. It also avoids any hanging.
+
+*** Exercise 1.8
+Newton's method for cube roots says that if y is an approximation to
+the root, a better one is given by:
+#+begin_example
+(/ (+ (/ x (* y y)) (* 2 y)) 3)
+#+end_example
+Use this to implement a cube root procedure similar to the square root
+procedure.
+
+[[file:cbrt.scm::;; Exercise 1.8][Cube Root Implementation]]
+
+** Section 1.2
+Procedures and the Processes They Generate
+
+*** Exercise 1.9
+Each of two procedures defines addition of two positive integers in
+terms of increments and decrements; illustrate the process generated
+by each procedure in evaluating =(+ 4 5)= and tell whether they are
+iterative or recursive.
+
+**** First
+#+begin_src scheme
+(define (+ a b)
+  (if (= a 0)
+      b
+      (inc (+ (dec a) b))))
+#+end_src
+
+#+begin_example
+(+ 4 5)
+
+(inc (+ (dec 4) 5))
+(inc (+ 3 5))
+
+(inc (inc (+ (dec 3) 5)))
+(inc (inc (+ 2 5)))
+
+(inc (inc (inc (+ (dec 2) 5))))
+(inc (inc (inc (+ 1 5))))
+
+(inc (inc (inc (inc (+ (dec 1) 5)))))
+(inc (inc (inc (inc (+ 0 5)))))
+
+(inc (inc (inc (inc 5))))
+(inc (inc (inc 6)))
+(inc (inc 7))
+(inc 8)
+
+9
+#+end_example
+
+This process is recursive, as "hidden" information about the process
+state is present as a chain of calls during interpretation.
+
+**** Second
+#+begin_src scheme
+(define (+ a b)
+  (if (= a 0)
+      b
+      (+ (dec a) (inc b))))
+#+end_src
+
+#+begin_example
+(+ 4 5)
+
+(+ (dec 4) (inc 5))
+(+ 3 6)
+
+(+ (dec 3) (inc 6))
+(+ 2 7)
+
+(+ (dec 2) (inc 7))
+(+ 1 8)
+
+(+ (dec 1) (inc 8))
+(+ 0 9)
+
+9
+#+end_example
+
+This process is iterative, as the variables passed to subsequent calls
+of =+= completely describe the state of the process.
+
+*** Exercise 1.10
+A procedure computes Ackermann's function. Find the values of three
+expressions. Give concise mathematical definitions for the functions
+computed by three procedures.
+
+#+begin_src scheme
+(define (A x y)
+  (cond ((= y 0) 0)
+        ((= x 0) (* 2 y))
+        ((= y 1) 2)
+        (else (A (- x 1)
+                  (A x (- y 1))))))
+#+end_src
+
+#+begin_example
+(A 1 10)
+
+(A (- 1 1) (A 1 (- 10 1)))
+(A 0 (A 1 9))
+
+(A 0 (A (- 1 1) (A 1 (- 9 1)))
+(A 0 (A 0 (A 1 8)))
+
+(A 0 (A 0 (A 0 (A 1 7))))
+(A 0 (A 0 (A 0 (A 0 (A 1 6)))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 1 5))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 1 4)))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 1 3)))))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 1 2)))))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 1 1))))))))))
+
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 2)))))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 4))))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 (A 0 8)))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 (A 0 16))))))
+(A 0 (A 0 (A 0 (A 0 (A 0 32)))))
+(A 0 (A 0 (A 0 (A 0 64))))
+(A 0 (A 0 (A 0 128)))
+(A 0 (A 0 256))
+(A 0 512)
+
+1024
+#+end_example
+
+#+begin_example
+(A 2 4)
+
+(A (- 2 1) (A 2 (- 4 1)))
+(A 1 (A 2 3))
+
+(A 1 (A (- 2 1) (A 2 (- 3 1))))
+(A 1 (A 1 (A 2 2)))
+
+(A 1 (A 1 (A (- 2 1) (A 2 (- 2 1)))))
+(A 1 (A 1 (A 1 (A 2 1))))
+(A 1 (A 1 (A 1 2)))
+
+(A 1 (A 1 (A (- 1 1) (A 1 (- 2 1)))))
+(A 1 (A 1 (A 0 (A 1 1))))
+(A 1 (A 1 (A 0 2)))
+(A 1 (A 1 4))
+
+(A 1 (A (- 1 1) (A 1 (- 4 1))))
+(A 1 (A 0 (A 1 3)))
+(A 1 (A 0 (A (- 1 1) (A 1 (- 3 1)))))
+(A 1 (A 0 (A 0 (A 1 2))))
+(A 1 (A 0 (A 0 (A (- 1 1) (A 1 (- 2 1))))))
+
+(A 1 (A 0 (A 0 (A 0 (A 1 1)))))
+(A 1 (A 0 (A 0 (A 0 2))))
+(A 1 (A 0 (A 0 4)))
+(A 1 (A 0 8))
+(A 1 16)
+
+...
+
+65536
+#+end_example
+
+#+begin_example
+(A 3 3)
+
+(A (- 3 1) (A 3 (- 3 1)))
+(A 2 (A 3 2))
+
+(A 2 (A (- 3 1) (A 3 (- 2 1))))
+(A 2 (A 2 (A 3 1)))
+
+(A 2 (A 2 2))
+(A 2 (A (- 2 1) (A 2 (- 2 1))))
+(A 2 (A 1 (A 2 1)))
+
+(A 2 (A 1 2))
+(A 2 (A (- 1 1) (A 1 (- 2 1))))
+(A 2 (A 0 (A 1 1)))
+
+(A 2 (A 0 2))
+(A 2 4)
+
+...
+
+65536
+#+end_example
+
+=(define (f n) (A 0 n))=
+Multiplication of 2
+
+2 * n
+or
+2[2]n
+
+=(define (g n) (A 1 n))=
+Exponentiation of 2
+
+2 ^ n
+or
+2[3]n
+
+=(define (h n) (A 2 n))=
+Tetration of 2
+
+2 ^ (2 ^ (2 ... )) {repeated n times}
+or
+2[4]n
+
